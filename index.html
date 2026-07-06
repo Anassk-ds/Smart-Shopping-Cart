@@ -1,191 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Shopping Cart</title>
-    <style>
-        *{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family:Arial,sans-serif;
-}
-
-body{
-    background:#eef2f7;
-    padding:20px;
-}
-
-header{
-    background:#2563eb;
-    color:white;
-    text-align:center;
-    padding:20px;
-    border-radius:10px;
-    margin-bottom:20px;
-}
-
-.controls{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    margin-bottom:20px;
-}
-
-input,select,button{
-    padding:10px;
-    border:1px solid #ccc;
-    border-radius:6px;
-    font-size:16px;
-}
-
-button{
-    background:#2563eb;
-    color:white;
-    border:none;
-    cursor:pointer;
-}
-
-button:hover{
-    background:#1d4ed8;
-}
-
-.products{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:20px;
-}
-
-.card{
-    background:white;
-    padding:15px;
-    border-radius:10px;
-    box-shadow:0 2px 8px rgba(0,0,0,.15);
-}
-
-.card button{
-    width:100%;
-    margin-top:10px;
-}
-
-table{
-    width:100%;
-    background:white;
-    border-collapse:collapse;
-    margin-top:20px;
-}
-
-th,td{
-    border:1px solid #ddd;
-    padding:10px;
-    text-align:center;
-}
-
-.summary{
-    margin-top:20px;
-    font-size:18px;
-}
-
-#invoice{
-    margin-top:20px;
-    background:white;
-    padding:20px;
-    border-radius:10px;
-    box-shadow:0 2px 8px rgba(0,0,0,.15);
-}
-    </style>
+<meta charset="UTF-8">
+<title>Smart Shopping Cart</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
-    <h1>🛒 Smart Shopping Cart</h1>
+  <h1>🛒 Smart Shopping Cart</h1>
 </header>
 
-<section class="controls">
+<main>
+  <!-- Catalog Panel -->
+  <section class="panel" id="catalogPanel">
+    <div class="controls">
+      <input type="text" id="searchInput" placeholder="Search products by name...">
+    </div>
+    <div class="controls category-btns" id="categoryButtons"></div>
+    <div id="productGrid"></div>
+    <div id="noResults" style="display:none;">No products match your search/filter.</div>
+  </section>
 
-    <input
-        type="text"
-        id="search"
-        placeholder="Search Product..."
-    >
+  <!-- Cart Panel -->
+  <section class="panel" id="cartPanel">
+    <h2>Your Cart</h2>
+    <table id="cartTable">
+      <thead>
+        <tr><th>Product</th><th>Price</th><th>Qty</th><th>Subtotal</th><th></th></tr>
+      </thead>
+      <tbody id="cartBody"></tbody>
+    </table>
+    <div id="emptyCartMsg" style="display:none; color:#777;">Your cart is empty.</div>
 
-    <select id="category">
-        <option value="All">All Categories</option>
-        <option value="Electronics">Electronics</option>
-        <option value="Stationery">Stationery</option>
-        <option value="Accessories">Accessories</option>
-    </select>
+    <div class="summary-row"><span>Total Items:</span><span id="totalItems">0</span></div>
+    <div class="summary-row"><span>Subtotal:</span><span id="subtotalPrice">₹0.00</span></div>
 
-</section>
+    <div class="coupon-row">
+      <input type="text" id="couponInput" placeholder="Coupon code">
+      <button id="applyCouponBtn" style="padding:8px 12px; border-radius:4px; border:1px solid var(--border); cursor:pointer;">Apply</button>
+    </div>
+    <div id="couponMsg"></div>
 
-<h2>Products</h2>
+    <div class="summary-row"><span>Discount:</span><span id="discountAmount">-₹0.00</span></div>
+    <div class="summary-row"><span>GST (5%):</span><span id="gstAmount">₹0.00</span></div>
+    <div class="summary-row total"><span>Grand Total:</span><span id="grandTotal">₹0.00</span></div>
 
-<div id="productContainer" class="products"></div>
+    <label for="customerName" style="display:block; margin-top:10px; font-size:0.9rem;">Customer Name</label>
+    <input type="text" id="customerName" placeholder="Enter your name" style="width:100%;">
 
-<hr>
+    <button id="checkoutBtn">Checkout</button>
+  </section>
+</main>
 
-<h2>Shopping Cart</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Product</th>
-            <th>Price</th>
-            <th>Qty</th>
-            <th>Total</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-
-    <tbody id="cartBody">
-
-    </tbody>
-</table>
-
-<div class="summary">
-
-    <h3>Total Items:
-        <span id="totalItems">0</span>
-    </h3>
-
-    <h3>Total Price:
-        ₹<span id="totalPrice">0</span>
-    </h3>
-
+<!-- Invoice Modal -->
+<div id="invoiceOverlay">
+  <div id="invoiceBox">
+    <div class="success-banner">✅ Order placed successfully!</div>
+    <h2>Invoice</h2>
+    <div id="invoiceDetails"></div>
+    <button id="closeInvoiceBtn">Close</button>
+  </div>
 </div>
 
-<hr>
-
-<h2>Coupon</h2>
-
-<input
-type="text"
-id="coupon"
-placeholder="Enter Coupon">
-
-<button id="applyCoupon">
-Apply Coupon
-</button>
-
-<p id="couponMsg"></p>
-
-<hr>
-
-<h2>Checkout</h2>
-
-<input
-type="text"
-id="customerName"
-placeholder="Customer Name">
-
-<button id="checkoutBtn">
-Checkout
-</button>
-
-<div id="invoice"></div>
-
 <script src="script.js"></script>
-
 </body>
-  </html>
+</html>
