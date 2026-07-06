@@ -1,320 +1,274 @@
-// ================= PRODUCTS =================
-
+// ---------- Data ----------
 const products = [
-    { id: 1, name: "Laptop", category: "Electronics", price: 55000 },
-    { id: 2, name: "Mouse", category: "Electronics", price: 700 },
-    { id: 3, name: "Keyboard", category: "Electronics", price: 1200 },
-    { id: 4, name: "Notebook", category: "Stationery", price: 80 },
-    { id: 5, name: "Pen", category: "Stationery", price: 20 },
-    { id: 6, name: "Pencil", category: "Stationery", price: 10 },
-    { id: 7, name: "Bag", category: "Accessories", price: 1200 },
-    { id: 8, name: "Water Bottle", category: "Accessories", price: 350 },
-    { id: 9, name: "Headphones", category: "Electronics", price: 2500 },
-    { id: 10, name: "Calculator", category: "Stationery", price: 600 }
+  { id: 1, name: "Wireless Mouse", category: "Electronics", price: 599 },
+  { id: 2, name: "Bluetooth Headphones", category: "Electronics", price: 1499 },
+  { id: 3, name: "USB-C Charging Cable", category: "Electronics", price: 299 },
+  { id: 4, name: "Mechanical Keyboard", category: "Electronics", price: 2499 },
+  { id: 5, name: "Notebook (A5, 200 pages)", category: "Stationery", price: 89 },
+  { id: 6, name: "Gel Pen Set (10pc)", category: "Stationery", price: 120 },
+  { id: 7, name: "Sticky Notes Pack", category: "Stationery", price: 65 },
+  { id: 8, name: "Highlighter Set", category: "Stationery", price: 150 },
+  { id: 9, name: "Leather Wallet", category: "Accessories", price: 899 },
+  { id: 10, name: "Sunglasses", category: "Accessories", price: 749 },
+  { id: 11, name: "Canvas Backpack", category: "Accessories", price: 1299 },
+  { id: 12, name: "Analog Wrist Watch", category: "Accessories", price: 1999 }
 ];
 
-let cart = [];
-let discount = 0;
+const coupons = {
+  "SAVE10": 0.10,
+  "SAVE20": 0.20
+};
 
-// ================= DISPLAY PRODUCTS =================
+const GST_RATE = 0.05;
 
-const productContainer = document.getElementById("productContainer");
+// ---------- State ----------
+let cart = []; // { id, name, price, quantity }
+let currentCategory = "All";
+let currentSearch = "";
+let appliedCoupon = null; // { code, rate }
+let invoiceCounter = 1000;
 
-function displayProducts(list) {
+// ---------- Elements ----------
+const productGrid = document.getElementById("productGrid");
+const noResults = document.getElementById("noResults");
+const searchInput = document.getElementById("searchInput");
+const categoryButtons = document.getElementById("categoryButtons");
+const cartBody = document.getElementById("cartBody");
+const emptyCartMsg = document.getElementById("emptyCartMsg");
+const totalItemsEl = document.getElementById("totalItems");
+const subtotalPriceEl = document.getElementById("subtotalPrice");
+const discountAmountEl = document.getElementById("discountAmount");
+const gstAmountEl = document.getElementById("gstAmount");
+const grandTotalEl = document.getElementById("grandTotal");
+const couponInput = document.getElementById("couponInput");
+const couponMsg = document.getElementById("couponMsg");
+const applyCouponBtn = document.getElementById("applyCouponBtn");
+const checkoutBtn = document.getElementById("checkoutBtn");
+const customerNameInput = document.getElementById("customerName");
+const invoiceOverlay = document.getElementById("invoiceOverlay");
+const invoiceDetails = document.getElementById("invoiceDetails");
+const closeInvoiceBtn = document.getElementById("closeInvoiceBtn");
 
-    productContainer.innerHTML = "";
-
-    list.forEach(product => {
-
-        const card = document.createElement("div");
-
-        card.className = "card";
-
-        card.innerHTML = `
-            <h3>${product.name}</h3>
-            <p><b>Category:</b> ${product.category}</p>
-            <p><b>Price:</b> ₹${product.price}</p>
-
-            <button onclick="addToCart(${product.id})">
-                Add to Cart
-            </button>
-        `;
-
-        productContainer.appendChild(card);
-
+// ---------- Catalog Rendering ----------
+function renderCategoryButtons() {
+  const categories = ["All", ...new Set(products.map(p => p.category))];
+  categoryButtons.innerHTML = "";
+  categories.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.textContent = cat;
+    if (cat === currentCategory) btn.classList.add("active");
+    btn.addEventListener("click", () => {
+      currentCategory = cat;
+      renderCategoryButtons();
+      renderProducts();
     });
-
+    categoryButtons.appendChild(btn);
+  });
 }
 
-displayProducts(products);
+function formatPrice(n) {
+  return "₹" + n.toFixed(2);
+}
 
-// ================= SEARCH =================
+function renderProducts() {
+  const filtered = products.filter(p => {
+    const matchesCategory = currentCategory === "All" || p.category === currentCategory;
+    const matchesSearch = p.name.toLowerCase().includes(currentSearch.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
-document
-.getElementById("search")
-.addEventListener("keyup", function () {
+  productGrid.innerHTML = "";
+  noResults.style.display = filtered.length === 0 ? "block" : "none";
 
-    const text = this.value.toLowerCase();
+  filtered.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.innerHTML = `
+      <h3>${escapeHtml(p.name)}</h3>
+      <div class="cat">${escapeHtml(p.category)}</div>
+      <div class="price">${formatPrice(p.price)}</div>
+      <button data-id="${p.id}">Add to Cart</button>
+    `;
+    card.querySelector("button").addEventListener("click", () => addToCart(p.id));
+    productGrid.appendChild(card);
+  });
+}
 
-    const filtered = products.filter(product =>
-        product.name.toLowerCase().includes(text)
-    );
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
 
-    displayProducts(filtered);
-
+searchInput.addEventListener("input", (e) => {
+  currentSearch = e.target.value;
+  renderProducts();
 });
 
-// ================= CATEGORY FILTER =================
+// ---------- Cart Logic ----------
+function addToCart(productId) {
+  const product = products.find(p => p.id === productId);
+  const existing = cart.find(item => item.id === productId);
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    cart.push({ id: product.id, name: product.name, price: product.price, quantity: 1 });
+  }
+  renderCart();
+}
 
-document
-.getElementById("category")
-.addEventListener("change", function () {
+function changeQuantity(productId, delta) {
+  const item = cart.find(i => i.id === productId);
+  if (!item) return;
+  item.quantity += delta;
+  if (item.quantity <= 0) {
+    cart = cart.filter(i => i.id !== productId);
+  }
+  renderCart();
+}
 
-    const category = this.value;
+function removeFromCart(productId) {
+  cart = cart.filter(i => i.id !== productId);
+  renderCart();
+}
 
-    if (category === "All") {
-        displayProducts(products);
-        return;
-    }
+function renderCart() {
+  cartBody.innerHTML = "";
+  emptyCartMsg.style.display = cart.length === 0 ? "block" : "none";
 
-    const filtered = products.filter(product =>
-        product.category === category
-    );
+  let totalItems = 0;
+  let subtotal = 0;
 
-    displayProducts(filtered);
+  cart.forEach(item => {
+    totalItems += item.quantity;
+    const itemSubtotal = item.price * item.quantity;
+    subtotal += itemSubtotal;
 
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${escapeHtml(item.name)}</td>
+      <td>${formatPrice(item.price)}</td>
+      <td class="qty-controls">
+        <button data-action="dec" data-id="${item.id}">-</button>
+        <span>${item.quantity}</span>
+        <button data-action="inc" data-id="${item.id}">+</button>
+      </td>
+      <td>${formatPrice(itemSubtotal)}</td>
+      <td><button class="remove-btn" data-id="${item.id}">✕</button></td>
+    `;
+    cartBody.appendChild(row);
+  });
+
+  cartBody.querySelectorAll('button[data-action="inc"]').forEach(btn =>
+    btn.addEventListener("click", () => changeQuantity(parseInt(btn.dataset.id), 1))
+  );
+  cartBody.querySelectorAll('button[data-action="dec"]').forEach(btn =>
+    btn.addEventListener("click", () => changeQuantity(parseInt(btn.dataset.id), -1))
+  );
+  cartBody.querySelectorAll('.remove-btn').forEach(btn =>
+    btn.addEventListener("click", () => removeFromCart(parseInt(btn.dataset.id)))
+  );
+
+  totalItemsEl.textContent = totalItems;
+  subtotalPriceEl.textContent = formatPrice(subtotal);
+
+  updateSummary(subtotal);
+}
+
+// ---------- Coupon Logic ----------
+applyCouponBtn.addEventListener("click", () => {
+  const code = couponInput.value.trim().toUpperCase();
+  if (!code) {
+    couponMsg.textContent = "Please enter a coupon code.";
+    couponMsg.className = "error";
+    return;
+  }
+  if (coupons[code]) {
+    appliedCoupon = { code, rate: coupons[code] };
+    couponMsg.textContent = `Coupon "${code}" applied: ${coupons[code] * 100}% off.`;
+    couponMsg.className = "success";
+  } else {
+    appliedCoupon = null;
+    couponMsg.textContent = "Invalid coupon code.";
+    couponMsg.className = "error";
+  }
+  const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  updateSummary(subtotal);
 });
 
-// ================= ADD TO CART =================
+function updateSummary(subtotal) {
+  const discount = appliedCoupon ? subtotal * appliedCoupon.rate : 0;
+  const afterDiscount = subtotal - discount;
+  const gst = afterDiscount * GST_RATE;
+  const grandTotal = afterDiscount + gst;
 
-function addToCart(id) {
-
-    const product = products.find(item => item.id === id);
-
-    const existing = cart.find(item => item.id === id);
-
-    if (existing) {
-
-        existing.qty++;
-
-    } else {
-
-        cart.push({
-            ...product,
-            qty: 1
-        });
-
-    }
-
-    updateCart();
-
-}
-// ================= UPDATE CART =================
-
-function updateCart() {
-
-    const cartBody = document.getElementById("cartBody");
-
-    cartBody.innerHTML = "";
-
-    let totalItems = 0;
-    let totalPrice = 0;
-
-    cart.forEach(item => {
-
-        totalItems += item.qty;
-
-        totalPrice += item.qty * item.price;
-
-        cartBody.innerHTML += `
-        <tr>
-
-            <td>${item.name}</td>
-
-            <td>₹${item.price}</td>
-
-            <td>
-
-                <button onclick="decreaseQty(${item.id})">-</button>
-
-                ${item.qty}
-
-                <button onclick="increaseQty(${item.id})">+</button>
-
-            </td>
-
-            <td>₹${item.qty * item.price}</td>
-
-            <td>
-
-                <button onclick="removeItem(${item.id})">
-
-                    Remove
-
-                </button>
-
-            </td>
-
-        </tr>
-        `;
-
-    });
-
-    document.getElementById("totalItems").textContent = totalItems;
-
-    document.getElementById("totalPrice").textContent = totalPrice;
-
+  discountAmountEl.textContent = "-" + formatPrice(discount);
+  gstAmountEl.textContent = formatPrice(gst);
+  grandTotalEl.textContent = formatPrice(grandTotal);
 }
 
-// ================= INCREASE QUANTITY =================
+// ---------- Checkout / Invoice ----------
+checkoutBtn.addEventListener("click", () => {
+  if (cart.length === 0) {
+    alert("Your cart is empty. Add some products before checking out.");
+    return;
+  }
+  const name = customerNameInput.value.trim();
+  if (!name) {
+    alert("Please enter your name before checking out.");
+    return;
+  }
 
-function increaseQty(id) {
+  const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const discount = appliedCoupon ? subtotal * appliedCoupon.rate : 0;
+  const afterDiscount = subtotal - discount;
+  const gst = afterDiscount * GST_RATE;
+  const grandTotal = afterDiscount + gst;
 
-    const item = cart.find(product => product.id === id);
+  invoiceCounter += 1;
+  const invoiceNumber = "INV-" + invoiceCounter;
+  const dateStr = new Date().toLocaleString();
 
-    item.qty++;
+  let rowsHtml = "";
+  cart.forEach(item => {
+    rowsHtml += `<tr>
+      <td>${escapeHtml(item.name)}</td>
+      <td>${item.quantity}</td>
+      <td>${formatPrice(item.price)}</td>
+      <td>${formatPrice(item.price * item.quantity)}</td>
+    </tr>`;
+  });
 
-    updateCart();
+  invoiceDetails.innerHTML = `
+    <p><strong>Customer:</strong> ${escapeHtml(name)}<br>
+    <strong>Invoice #:</strong> ${invoiceNumber}<br>
+    <strong>Date:</strong> ${dateStr}</p>
+    <table>
+      <thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="summary-row"><span>Subtotal:</span><span>${formatPrice(subtotal)}</span></div>
+    <div class="summary-row"><span>Discount${appliedCoupon ? " (" + appliedCoupon.code + ")" : ""}:</span><span>-${formatPrice(discount)}</span></div>
+    <div class="summary-row"><span>GST (5%):</span><span>${formatPrice(gst)}</span></div>
+    <div class="summary-row total"><span>Grand Total:</span><span>${formatPrice(grandTotal)}</span></div>
+  `;
 
-}
+  invoiceOverlay.classList.add("show");
 
-// ================= DECREASE QUANTITY =================
-
-function decreaseQty(id) {
-
-    const item = cart.find(product => product.id === id);
-
-    if (item.qty > 1) {
-
-        item.qty--;
-
-    } else {
-
-        cart = cart.filter(product => product.id !== id);
-
-    }
-
-    updateCart();
-
-}
-
-// ================= REMOVE PRODUCT =================
-
-function removeItem(id) {
-
-    cart = cart.filter(product => product.id !== id);
-
-    updateCart();
-
-}
-// ================= APPLY COUPON =================
-
-document.getElementById("applyCoupon").addEventListener("click", () => {
-
-    const code = document
-        .getElementById("coupon")
-        .value
-        .trim()
-        .toUpperCase();
-
-    const msg = document.getElementById("couponMsg");
-
-    if (code === "SAVE10") {
-
-        discount = 10;
-        msg.innerHTML = "✅ SAVE10 Applied (10% Discount)";
-
-    }
-    else if (code === "SAVE20") {
-
-        discount = 20;
-        msg.innerHTML = "✅ SAVE20 Applied (20% Discount)";
-
-    }
-    else {
-
-        discount = 0;
-        msg.innerHTML = "❌ Invalid Coupon";
-
-    }
-
+  // Clear cart automatically
+  cart = [];
+  appliedCoupon = null;
+  couponInput.value = "";
+  couponMsg.textContent = "";
+  customerNameInput.value = "";
+  renderCart();
 });
 
-// ================= CHECKOUT =================
+closeInvoiceBtn.addEventListener("click", () => {
+  invoiceOverlay.classList.remove("show");
+});
 
-document.getElementById("checkoutBtn").addEventListener("click", checkout);
-
-function checkout() {
-
-    if (cart.length === 0) {
-
-        alert("Cart is Empty!");
-        return;
-
-    }
-
-    const customer = document
-        .getElementById("customerName")
-        .value
-        .trim();
-
-    if (customer === "") {
-
-        alert("Enter Customer Name");
-        return;
-
-    }
-
-    let subtotal = 0;
-
-    cart.forEach(item => {
-
-        subtotal += item.price * item.qty;
-
-    });
-
-    const discountAmount = subtotal * (discount / 100);
-
-    const afterDiscount = subtotal - discountAmount;
-
-    const gst = afterDiscount * 0.18;
-
-    const grandTotal = afterDiscount + gst;
-
-    const invoiceNo = Math.floor(Math.random() * 1000000);
-
-    const date = new Date().toLocaleString();
-
-    let items = "";
-
-    cart.forEach(item => {
-
-        items += `
-${item.name}
-Qty : ${item.qty}
-Price : ₹${item.price}
-Total : ₹${item.qty * item.price}
-
-`;
-
-    });
-
-    document.getElementById("invoice").innerHTML = `
-
-<h2>Invoice</h2>
-
-<hr>
-
-<b>Customer :</b> ${customer}<br>
-<b>Invoice No :</b> ${invoiceNo}<br>
-<b>Date :</b> ${date}
-
-<hr>
-
-<pre>${items}</pre>
-
-<hr>
-
-<b>Subtotal :</b> ₹${subtotal}<br>
-
-<b>Discount
+// ---------- Init ----------
+renderCategoryButtons();
+renderProducts();
+renderCart();
