@@ -1,7 +1,6 @@
 # Smart Shopping Cart
 
 A browser-based shopping cart app built with plain HTML, CSS, and JavaScript. No frameworks, no local storage, no backend — everything runs in memory in the browser.
-
 ## Files
 
 | File | Purpose |
