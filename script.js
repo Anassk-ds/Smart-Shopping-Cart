@@ -1,4 +1,4 @@
-// ---------- Data ----------
+// --------- Data ---------
 const products = [
   { id: 1, name: "Wireless Mouse", category: "Electronics", price: 599 },
   { id: 2, name: "Bluetooth Headphones", category: "Electronics", price: 1499 },
